@@ -126,11 +126,9 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         _ItemEntry(
           productId: product?.id,
           nameController: TextEditingController(text: product?.name ?? ''),
-          quantityController: TextEditingController(text: '100'),
+          quantityController: TextEditingController(text: ''),
           rateController: TextEditingController(
-            text: product != null
-                ? product.defaultRate.toStringAsFixed(2)
-                : '34.00',
+            text: product != null ? product.defaultRate.toStringAsFixed(2) : '',
           ),
           unit: product?.unit ?? 'Nos',
         ),
@@ -153,7 +151,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     });
   }
 
-  void _addCharge([String name = 'Vehicle Charge', double defaultAmt = 0.0]) {
+  void _addCharge([String name = '', double defaultAmt = 0.0]) {
     setState(() {
       _charges.add(
         _ChargeEntry(
@@ -996,7 +994,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   controller: item.quantityController,
                   decoration: InputDecoration(
                     labelText: 'Qty (${item.unit})',
-                    hintText: '100',
+                    hintText: '',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
