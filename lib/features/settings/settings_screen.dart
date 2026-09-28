@@ -123,6 +123,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         termsAndConditions: _termsController.text.trim(),
         invoicePrefix: _invoicePrefixController.text.trim().toUpperCase(),
         startingInvoiceNumber: startingSeq,
+        financialYear:
+            ref.read(settingsProvider).value?.financialYear ?? '26-27',
         customLogoPath: _customLogoPath,
       );
 
@@ -151,289 +153,324 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsAsync = ref.watch(settingsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings & Company Info')),
-      body: settingsAsync.when(
-        data: (settings) {
-          _populate(settings);
-          return Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Logo & Watermark Settings
-                _buildCard(
-                  title: 'Company Logo & Watermark',
-                  icon: Icons.image_outlined,
-                  children: [
-                    Center(
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceVariant,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: LogoWidget(
-                              size: 90,
-                              customPath: _customLogoPath,
-                            ),
-                          ),
-
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              OutlinedButton.icon(
-                                icon: const Icon(Icons.upload_file, size: 16),
-                                label: const Text('Change Logo'),
-                                onPressed: _pickCustomLogo,
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text('Settings & Company Info'),
+      ),
+      body: SafeArea(
+        top: false,
+        child: settingsAsync.when(
+          data: (settings) {
+            _populate(settings);
+            return Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Logo & Watermark Settings
+                  _buildCard(
+                    title: 'Company Logo & Watermark',
+                    icon: Icons.image_outlined,
+                    children: [
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
                               ),
-                              if (_customLogoPath != null) ...[
-                                const SizedBox(width: 8),
-                                TextButton.icon(
-                                  icon: const Icon(
-                                    Icons.restore,
-                                    size: 16,
-                                    color: AppColors.unpaidRed,
-                                  ),
-                                  label: const Text(
-                                    'Reset Logo',
-                                    style: TextStyle(
+                              child: LogoWidget(
+                                size: 90,
+                                customPath: _customLogoPath,
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.upload_file, size: 16),
+                                  label: const Text('Change Logo'),
+                                  onPressed: _pickCustomLogo,
+                                ),
+                                if (_customLogoPath != null) ...[
+                                  const SizedBox(width: 8),
+                                  TextButton.icon(
+                                    icon: const Icon(
+                                      Icons.restore,
+                                      size: 16,
                                       color: AppColors.unpaidRed,
                                     ),
+                                    label: const Text(
+                                      'Reset Logo',
+                                      style: TextStyle(
+                                        color: AppColors.unpaidRed,
+                                      ),
+                                    ),
+                                    onPressed: _resetToDefaultLogo,
                                   ),
-                                  onPressed: _resetToDefaultLogo,
-                                ),
+                                ],
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'This logo is automatically placed in invoice headers and as a subtle watermark in bills & generated PDFs.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textMuted,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            const Text(
+                              'This logo is automatically placed in invoice headers and as a subtle watermark in bills & generated PDFs.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMuted,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                // Company Details
-                _buildCard(
-                  title: 'Business Information',
-                  icon: Icons.business_outlined,
-                  children: [
-                    TextFormField(
-                      controller: _companyNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Business / Company Name *',
-                        hintText: 'e.g. MIGHTY',
-                      ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Company name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _subtitleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Subtitle / Tagline',
-                        hintText: 'e.g. INTERLOCKS / HOLLOW BLOCKS',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Business Mobile Number *',
-                        hintText: '+91 98765 43210',
-                        prefixIcon: Icon(Icons.phone_outlined),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Mobile number is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _addressController,
-                      decoration: const InputDecoration(
-                        labelText: 'Factory / Yard Address',
-                        hintText: 'Industrial Area, Bypass Road, Main Gate',
-                        prefixIcon: Icon(Icons.location_on_outlined),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _gstController,
-                            decoration: const InputDecoration(
-                              labelText: 'GSTIN Number',
-                              hintText: '32AAAAA0000A1Z5',
-                            ),
-                          ),
+                  // Company Details
+                  _buildCard(
+                    title: 'Business Information',
+                    icon: Icons.business_outlined,
+                    children: [
+                      TextFormField(
+                        controller: _companyNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Business / Company Name *',
+                          hintText: 'e.g. MIGHTY',
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email Address',
-                              hintText: 'contact@mighty.com',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Invoice Configuration
-                _buildCard(
-                  title: 'Invoice & Numbering Settings',
-                  icon: Icons.receipt_long_outlined,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _invoicePrefixController,
-                            decoration: const InputDecoration(
-                              labelText: 'Invoice Prefix',
-                              hintText: 'INV',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _startingSeqController,
-                            decoration: const InputDecoration(
-                              labelText: 'Starting Number',
-                              hintText: '1',
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Company name is required';
+                          }
+                          return null;
+                        },
                       ),
-                      child: Row(
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _subtitleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Subtitle / Tagline',
+                          hintText: 'e.g. INTERLOCKS / HOLLOW BLOCKS',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Business Mobile Number *',
+                          hintText: '+91 98765 43210',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Mobile number is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Factory / Yard Address',
+                          hintText: 'Industrial Area, Bypass Road, Main Gate',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          const Icon(
-                            Icons.info_outline,
-                            size: 18,
-                            color: AppColors.accent,
-                          ),
-                          const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              'Sample next invoice: ${_invoicePrefixController.text.trim().toUpperCase()}/${FinancialYearUtil.getFinancialYear()}/${(_startingSeqController.text.trim().padLeft(4, "0"))}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
+                            child: TextFormField(
+                              controller: _gstController,
+                              decoration: const InputDecoration(
+                                labelText: 'GSTIN Number',
+                                hintText: '32AAAAA0000A1Z5',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(
+                                labelText: 'Email Address',
+                                hintText: 'contact@mighty.com',
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _termsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Default Terms & Conditions',
-                        hintText: 'Goods once sold will not be taken back.',
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Invoice Configuration
+                  _buildCard(
+                    title: 'Invoice & Numbering Settings',
+                    icon: Icons.receipt_long_outlined,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _invoicePrefixController,
+                              decoration: const InputDecoration(
+                                labelText: 'Invoice Prefix',
+                                hintText: 'INV',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _startingSeqController,
+                              decoration: const InputDecoration(
+                                labelText: 'Starting Number',
+                                hintText: '1',
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
                       ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                PrimaryButton(
-                  label: 'Save Configuration',
-                  icon: Icons.save_outlined,
-                  isLoading: _isSaving,
-                  onPressed: _saveSettings,
-                ),
-                const SizedBox(height: 24),
-
-                // Data Management (Production Readiness)
-                _buildCard(
-                  title: 'Data & Maintenance',
-                  icon: Icons.cleaning_services_outlined,
-                  children: [
-                    const Text(
-                      'Prepare app for live production by clearing any initial test data or transactions.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.receipt_long, size: 16, color: AppColors.unpaidRed),
-                            label: const Text(
-                              'Clear Bills',
-                              style: TextStyle(color: AppColors.unpaidRed, fontSize: 13),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: AppColors.unpaidRed.withValues(alpha: 0.5)),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                            onPressed: _confirmClearInvoices,
-                          ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.people_outline, size: 16, color: AppColors.unpaidRed),
-                            label: const Text(
-                              'Clear Customers',
-                              style: TextStyle(color: AppColors.unpaidRed, fontSize: 13),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: AppColors.accent,
                             ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: AppColors.unpaidRed.withValues(alpha: 0.5)),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Sample next invoice: ${_invoicePrefixController.text.trim().toUpperCase()}/${FinancialYearUtil.getFinancialYear()}/${(_startingSeqController.text.trim().padLeft(4, "0"))}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ),
-                            onPressed: _confirmClearCustomers,
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _termsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Default Terms & Conditions',
+                          hintText: 'Goods once sold will not be taken back.',
+                        ),
+                        maxLines: 3,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  PrimaryButton(
+                    label: 'Save Configuration',
+                    icon: Icons.save_outlined,
+                    isLoading: _isSaving,
+                    onPressed: _saveSettings,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Data Management (Production Readiness)
+                  _buildCard(
+                    title: 'Data & Maintenance',
+                    icon: Icons.cleaning_services_outlined,
+                    children: [
+                      const Text(
+                        'Prepare app for live production by clearing any initial test data or transactions.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.receipt_long,
+                                size: 16,
+                                color: AppColors.unpaidRed,
+                              ),
+                              label: const Text(
+                                'Clear Bills',
+                                style: TextStyle(
+                                  color: AppColors.unpaidRed,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: AppColors.unpaidRed.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                              ),
+                              onPressed: _confirmClearInvoices,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.people_outline,
+                                size: 16,
+                                color: AppColors.unpaidRed,
+                              ),
+                              label: const Text(
+                                'Clear Customers',
+                                style: TextStyle(
+                                  color: AppColors.unpaidRed,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: AppColors.unpaidRed.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                              ),
+                              onPressed: _confirmClearCustomers,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('Error: $e')),
+        ),
       ),
     );
   }
@@ -477,7 +514,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Clear All Bills?'),
         content: const Text(
-          'This will permanently remove all test/draft bills and reset dashboard metrics to zero for production. This action cannot be undone.',
+          'This will permanently remove all bills/draft bills and reset dashboard metrics to zero for production. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -485,9 +522,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.unpaidRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.unpaidRed,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Clear All Bills', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Clear All Bills',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -501,7 +543,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All bills cleared. Ready for fresh production entries!')),
+          const SnackBar(
+            content: Text(
+              'All bills cleared. Ready for fresh production entries!',
+            ),
+          ),
         );
       }
     }
@@ -521,9 +567,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.unpaidRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.unpaidRed,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Clear Customers', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Clear Customers',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

@@ -24,6 +24,7 @@ class InvoiceHistoryScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: const Text('Invoice History'),
         actions: [
           PopupMenuButton<InvoiceSortOption>(
@@ -64,7 +65,9 @@ class InvoiceHistoryScreen extends ConsumerWidget {
           );
         },
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // Search Field
           Padding(
@@ -138,16 +141,7 @@ class InvoiceHistoryScreen extends ConsumerWidget {
                     message: searchQuery.isNotEmpty || currentStatus != null
                         ? 'Try clearing search or changing status filter.'
                         : 'Create your first invoice for Mighty Hollow Blocks.',
-                    buttonLabel: searchQuery.isEmpty && currentStatus == null ? 'Create Bill' : null,
-                    onButtonPressed: searchQuery.isEmpty && currentStatus == null
-                        ? () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const CreateInvoiceScreen(),
-                              ),
-                            );
-                          }
-                        : null,
+                  
                   );
                 }
 
@@ -167,7 +161,8 @@ class InvoiceHistoryScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _filterChip({

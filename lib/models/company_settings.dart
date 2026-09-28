@@ -11,6 +11,7 @@ class CompanySettings {
   final String termsAndConditions;
   final String invoicePrefix;
   final int startingInvoiceNumber;
+  final String financialYear;
   final String? customLogoPath;
 
   const CompanySettings({
@@ -24,6 +25,7 @@ class CompanySettings {
     this.termsAndConditions = AppConstants.defaultTerms,
     this.invoicePrefix = AppConstants.defaultInvoicePrefix,
     this.startingInvoiceNumber = 1,
+    this.financialYear = '26-27',
     this.customLogoPath,
   });
 
@@ -38,6 +40,7 @@ class CompanySettings {
     String? termsAndConditions,
     String? invoicePrefix,
     int? startingInvoiceNumber,
+    String? financialYear,
     String? customLogoPath,
     bool clearCustomLogo = false,
   }) {
@@ -52,6 +55,7 @@ class CompanySettings {
       termsAndConditions: termsAndConditions ?? this.termsAndConditions,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       startingInvoiceNumber: startingInvoiceNumber ?? this.startingInvoiceNumber,
+      financialYear: financialYear ?? this.financialYear,
       customLogoPath: clearCustomLogo ? null : (customLogoPath ?? this.customLogoPath),
     );
   }
@@ -66,8 +70,10 @@ class CompanySettings {
       'gstNumber': gstNumber,
       'website': website,
       'termsAndConditions': termsAndConditions,
+      'terms': termsAndConditions,
       'invoicePrefix': invoicePrefix,
       'startingInvoiceNumber': startingInvoiceNumber,
+      'financialYear': financialYear,
       'customLogoPath': customLogoPath,
     };
   }
@@ -81,10 +87,15 @@ class CompanySettings {
       email: (map['email'] as String?) ?? AppConstants.defaultCompanyEmail,
       gstNumber: (map['gstNumber'] as String?) ?? AppConstants.defaultCompanyGst,
       website: (map['website'] as String?) ?? '',
-      termsAndConditions: (map['termsAndConditions'] as String?) ?? AppConstants.defaultTerms,
+      termsAndConditions: (map['termsAndConditions'] as String?) ?? (map['terms'] as String?) ?? AppConstants.defaultTerms,
       invoicePrefix: (map['invoicePrefix'] as String?) ?? AppConstants.defaultInvoicePrefix,
       startingInvoiceNumber: (map['startingInvoiceNumber'] as int?) ?? 1,
+      financialYear: (map['financialYear'] as String?) ?? '26-27',
       customLogoPath: map['customLogoPath'] as String?,
     );
   }
+
+  Map<String, dynamic> toFirestore() => toMap();
+
+  factory CompanySettings.fromFirestore(Map<String, dynamic> data) => CompanySettings.fromMap(data);
 }

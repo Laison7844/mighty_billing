@@ -1,66 +1,71 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/config/company_config.dart';
 import '../../models/customer.dart';
-import '../database/app_database.dart';
 
 class CustomerRepository {
-  final AppDatabase dbProvider;
-
-  CustomerRepository({AppDatabase? dbProvider})
-      : dbProvider = dbProvider ?? AppDatabase.instance;
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      CompanyConfig.customersCollection();
 
   Future<List<Customer>> getAllCustomers({String? searchQuery}) async {
-    final db = await dbProvider.database;
-    List<Map<String, dynamic>> results;
+    try {
+      final snapshot = await _collection.orderBy('name').get();
+      final customers = snapshot.docs
+          .map((doc) => Customer.fromFirestore(doc))
+          .toList();
 
-    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      final query = '%${searchQuery.trim()}%';
-      results = await db.query(
-        'customers',
-        where: 'name LIKE ? OR phone LIKE ? OR address LIKE ?',
-        whereArgs: [query, query, query],
-        orderBy: 'name ASC',
-      );
-    } else {
-      results = await db.query('customers', orderBy: 'name ASC');
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final query = searchQuery.trim().toLowerCase();
+        return customers.where((c) {
+          final nameMatch = c.name.toLowerCase().contains(query);
+          final phoneMatch = c.phone.toLowerCase().contains(query);
+          final addressMatch = c.address.toLowerCase().contains(query);
+          final gstMatch = (c.gstNumber ?? '').toLowerCase().contains(query);
+          return nameMatch || phoneMatch || addressMatch || gstMatch;
+        }).toList();
+      }
+
+      return customers;
+    } catch (e) {
+      // In case of error (e.g. initial offline with empty cache), return empty list or rethrow
+      return [];
     }
-
-    return results.map((map) => Customer.fromMap(map)).toList();
   }
 
   Future<Customer?> getCustomerById(String id) async {
-    final db = await dbProvider.database;
-    final results = await db.query('customers', where: 'id = ?', whereArgs: [id]);
-    if (results.isEmpty) return null;
-    return Customer.fromMap(results.first);
+    try {
+      final doc = await _collection.doc(id).get();
+      if (!doc.exists) return null;
+      return Customer.fromFirestore(doc);
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<Customer> saveCustomer(Customer customer) async {
-    final db = await dbProvider.database;
-    await db.insert(
-      'customers',
-      customer.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    await _collection.doc(customer.id).set(
+      customer.toFirestore(),
+      SetOptions(merge: true),
     );
     return customer;
   }
 
   Future<void> updateCustomer(Customer customer) async {
-    final db = await dbProvider.database;
-    await db.update(
-      'customers',
-      customer.toMap(),
-      where: 'id = ?',
-      whereArgs: [customer.id],
+    await _collection.doc(customer.id).set(
+      customer.toFirestore(),
+      SetOptions(merge: true),
     );
   }
 
   Future<void> deleteCustomer(String id) async {
-    final db = await dbProvider.database;
-    await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+    await _collection.doc(id).delete();
   }
 
   Future<void> deleteAllCustomers() async {
-    final db = await dbProvider.database;
-    await db.delete('customers');
+    final snapshot = await _collection.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 }

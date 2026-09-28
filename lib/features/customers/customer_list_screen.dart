@@ -17,6 +17,7 @@ class CustomerListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: const Text('Customers'),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -42,7 +43,9 @@ class CustomerListScreen extends ConsumerWidget {
           }
         },
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // Search Bar
           Padding(
@@ -77,20 +80,20 @@ class CustomerListScreen extends ConsumerWidget {
                     message: searchQuery.isNotEmpty
                         ? 'Try searching with a different name or phone number.'
                         : 'Add your first customer to get started with billing.',
-                    buttonLabel: searchQuery.isEmpty ? 'Add Customer' : null,
-                    onButtonPressed: searchQuery.isEmpty
-                        ? () async {
-                            final newCustomer = await showDialog<Customer>(
-                              context: context,
-                              builder: (context) => const CustomerFormDialog(),
-                            );
-                            if (newCustomer != null) {
-                              final repo = ref.read(customerRepositoryProvider);
-                              await repo.saveCustomer(newCustomer);
-                              ref.invalidate(customersProvider);
-                            }
-                          }
-                        : null,
+                    // buttonLabel: searchQuery.isEmpty ? 'Add Customer' : null,
+                    // onButtonPressed: searchQuery.isEmpty
+                    //     ? () async {
+                    //         final newCustomer = await showDialog<Customer>(
+                    //           context: context,
+                    //           builder: (context) => const CustomerFormDialog(),
+                    //         );
+                    //         if (newCustomer != null) {
+                    //           final repo = ref.read(customerRepositoryProvider);
+                    //           await repo.saveCustomer(newCustomer);
+                    //           ref.invalidate(customersProvider);
+                    //         }
+                    //       }
+                    //     : null,
                   );
                 }
 
@@ -149,6 +152,7 @@ class CustomerListScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }

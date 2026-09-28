@@ -1,61 +1,68 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/config/company_config.dart';
 import '../../models/product.dart';
-import '../database/app_database.dart';
 
 class ProductRepository {
-  final AppDatabase dbProvider;
-
-  ProductRepository({AppDatabase? dbProvider})
-      : dbProvider = dbProvider ?? AppDatabase.instance;
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      CompanyConfig.productsCollection();
 
   Future<List<Product>> getAllProducts({String? searchQuery}) async {
-    final db = await dbProvider.database;
-    List<Map<String, dynamic>> results;
+    try {
+      final snapshot = await _collection.orderBy('name').get();
+      final products = snapshot.docs
+          .map((doc) => Product.fromFirestore(doc))
+          .toList();
 
-    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      final query = '%${searchQuery.trim()}%';
-      results = await db.query(
-        'products',
-        where: 'name LIKE ? OR unit LIKE ?',
-        whereArgs: [query, query],
-        orderBy: 'name ASC',
-      );
-    } else {
-      results = await db.query('products', orderBy: 'name ASC');
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final query = searchQuery.trim().toLowerCase();
+        return products.where((p) {
+          final nameMatch = p.name.toLowerCase().contains(query);
+          final unitMatch = p.unit.toLowerCase().contains(query);
+          return nameMatch || unitMatch;
+        }).toList();
+      }
+
+      return products;
+    } catch (e) {
+      return [];
     }
-
-    return results.map((map) => Product.fromMap(map)).toList();
   }
 
   Future<Product?> getProductById(String id) async {
-    final db = await dbProvider.database;
-    final results = await db.query('products', where: 'id = ?', whereArgs: [id]);
-    if (results.isEmpty) return null;
-    return Product.fromMap(results.first);
+    try {
+      final doc = await _collection.doc(id).get();
+      if (!doc.exists) return null;
+      return Product.fromFirestore(doc);
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<Product> saveProduct(Product product) async {
-    final db = await dbProvider.database;
-    await db.insert(
-      'products',
-      product.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    await _collection.doc(product.id).set(
+      product.toFirestore(),
+      SetOptions(merge: true),
     );
     return product;
   }
 
   Future<void> updateProduct(Product product) async {
-    final db = await dbProvider.database;
-    await db.update(
-      'products',
-      product.toMap(),
-      where: 'id = ?',
-      whereArgs: [product.id],
+    await _collection.doc(product.id).set(
+      product.toFirestore(),
+      SetOptions(merge: true),
     );
   }
 
   Future<void> deleteProduct(String id) async {
-    final db = await dbProvider.database;
-    await db.delete('products', where: 'id = ?', whereArgs: [id]);
+    await _collection.doc(id).delete();
+  }
+
+  Future<void> deleteAllProducts() async {
+    final snapshot = await _collection.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 }

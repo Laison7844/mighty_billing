@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:billing/core/utils/currency_formatter.dart';
 import 'package:billing/core/utils/financial_year_util.dart';
+import 'package:billing/models/customer.dart';
+import 'package:billing/models/product.dart';
 import 'package:billing/models/invoice.dart';
 import 'package:billing/models/invoice_item.dart';
 import 'package:billing/models/additional_charge.dart';
@@ -53,6 +55,63 @@ void main() {
     });
   });
 
+  group('Customer Model & GST Tests', () {
+    test('Customer can be created with and without optional GST number', () {
+      final now = DateTime.now();
+      final customerWithoutGst = Customer(
+        id: 'cust-1',
+        name: 'Ringle',
+        phone: '98470 12345',
+        address: 'Trivandrum',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      expect(customerWithoutGst.gstNumber, isNull);
+
+      final customerWithGst = Customer(
+        id: 'cust-2',
+        name: 'John Masonry',
+        phone: '94471 56789',
+        address: 'Kochi',
+        gstNumber: '32ABCDE1234F1Z5',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      expect(customerWithGst.gstNumber, '32ABCDE1234F1Z5');
+
+      final map = customerWithGst.toMap();
+      expect(map['gstNumber'], '32ABCDE1234F1Z5');
+
+      final recreated = Customer.fromMap(map);
+      expect(recreated.gstNumber, '32ABCDE1234F1Z5');
+      expect(recreated.name, 'John Masonry');
+    });
+  });
+
+  group('Product Model Tests', () {
+    test('Product serializes and deserializes correctly', () {
+      final now = DateTime.now();
+      final product = Product(
+        id: 'prod-1',
+        name: '6 inch Block',
+        unit: 'Nos',
+        defaultRate: 42.0,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final map = product.toMap();
+      expect(map['name'], '6 inch Block');
+      expect(map['defaultRate'], 42.0);
+
+      final recreated = Product.fromMap(map);
+      expect(recreated.id, 'prod-1');
+      expect(recreated.defaultRate, 42.0);
+    });
+  });
+
   group('Invoice Model & Status Tests', () {
     final sampleItems = [
       const InvoiceItem(
@@ -77,6 +136,7 @@ void main() {
         customerNameSnapshot: 'Ringle',
         customerPhoneSnapshot: '98470 12345',
         customerAddressSnapshot: 'Green Valley Site',
+        customerGstNumberSnapshot: '32ABCDE1234F1Z5',
         date: DateTime(2026, 9, 26),
         items: sampleItems,
         additionalCharges: sampleCharges,
@@ -92,6 +152,33 @@ void main() {
       expect(invoice.additionalChargesTotal, 500);
       expect(invoice.total, 3900);
       expect(invoice.balanceDue, 3900);
+      expect(invoice.customerGstNumberSnapshot, '32ABCDE1234F1Z5');
+    });
+
+    test('Invoice preserves GST snapshot independently of customer changes', () {
+      final originalInvoice = Invoice(
+        id: 'test-snap',
+        invoiceNumber: 'INV/26-27/0038',
+        customerId: 'cust-1',
+        customerNameSnapshot: 'Ringle',
+        customerPhoneSnapshot: '98470 12345',
+        customerAddressSnapshot: 'Trivandrum',
+        customerGstNumberSnapshot: '32ABCDE1234F1Z5',
+        date: DateTime(2026, 9, 26),
+        items: sampleItems,
+        additionalCharges: [],
+        subtotal: 3400,
+        total: 3400,
+        paidAmount: 3400,
+        balanceDue: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Even if customer changes their GST number later, the invoice snapshot remains constant
+      const updatedCustomerGst = '32XXXXX9999X1Z1';
+      expect(originalInvoice.customerGstNumberSnapshot, '32ABCDE1234F1Z5');
+      expect(originalInvoice.customerGstNumberSnapshot != updatedCustomerGst, isTrue);
     });
 
     test('PaymentStatus is PARTIALLY PAID when partially paid', () {
@@ -132,7 +219,7 @@ void main() {
       expect(invoice.paymentStatus, PaymentStatus.paid);
     });
 
-    test('PDF Generator produces non-empty valid PDF bytes', () async {
+    test('PDF Generator produces valid PDF with customer GST snapshot', () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       final invoice = Invoice(
         id: 'test-pdf',
@@ -140,6 +227,7 @@ void main() {
         customerNameSnapshot: 'Ringle',
         customerPhoneSnapshot: '98470 12345',
         customerAddressSnapshot: 'Green Valley Site, Plot #12',
+        customerGstNumberSnapshot: '32ABCDE1234F1Z5',
         date: DateTime(2026, 9, 26),
         items: sampleItems,
         additionalCharges: sampleCharges,
@@ -164,6 +252,41 @@ void main() {
 
       expect(pdfBytes.isNotEmpty, isTrue);
       // PDF documents start with '%PDF'
+      final header = String.fromCharCodes(pdfBytes.sublist(0, 4));
+      expect(header, '%PDF');
+    });
+
+    test('PDF Generator produces valid PDF without customer GST snapshot (omits GST row)', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final invoice = Invoice(
+        id: 'test-pdf-no-gst',
+        invoiceNumber: 'INV/26-27/0038',
+        customerNameSnapshot: 'Ringle',
+        customerPhoneSnapshot: '98470 12345',
+        customerAddressSnapshot: 'Trivandrum',
+        customerGstNumberSnapshot: null,
+        date: DateTime(2026, 9, 26),
+        items: sampleItems,
+        additionalCharges: [],
+        subtotal: 3400,
+        total: 3400,
+        paidAmount: 3400,
+        balanceDue: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      const settings = CompanySettings(
+        companyName: 'MIGHTY',
+        phone: '+91 98765 43210',
+      );
+
+      final pdfBytes = await InvoicePdfGenerator.generateInvoicePdf(
+        invoice: invoice,
+        settings: settings,
+      );
+
+      expect(pdfBytes.isNotEmpty, isTrue);
       final header = String.fromCharCodes(pdfBytes.sublist(0, 4));
       expect(header, '%PDF');
     });

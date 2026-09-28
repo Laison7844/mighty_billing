@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "mighty-billing",
+          "appId": "1:909807510132:android:7dac36e8af2c684fe4e721",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mighty-billing",
+          "configurations": {
+            "android": "1:909807510132:android:7dac36e8af2c684fe4e721",
+            "web": "1:909807510132:web:392576d1552b6335e4e721"
+          }
+        }
+      }
+    }
+  }
+}

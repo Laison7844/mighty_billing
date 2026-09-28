@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'invoice_item.dart';
 import 'additional_charge.dart';
 
@@ -18,6 +19,7 @@ class Invoice {
   final String customerNameSnapshot;
   final String customerPhoneSnapshot;
   final String customerAddressSnapshot;
+  final String? customerGstNumberSnapshot;
   final DateTime date;
   final List<InvoiceItem> items;
   final List<AdditionalCharge> additionalCharges;
@@ -36,6 +38,7 @@ class Invoice {
     required this.customerNameSnapshot,
     this.customerPhoneSnapshot = '',
     this.customerAddressSnapshot = '',
+    this.customerGstNumberSnapshot,
     required this.date,
     required this.items,
     required this.additionalCharges,
@@ -59,7 +62,7 @@ class Invoice {
   }
 
   double get additionalChargesTotal {
-    return additionalCharges.fold(0.0, (sum, item) => sum + item.amount);
+    return additionalCharges.fold(0.0, (total, item) => total + item.amount);
   }
 
   Invoice copyWith({
@@ -69,6 +72,8 @@ class Invoice {
     String? customerNameSnapshot,
     String? customerPhoneSnapshot,
     String? customerAddressSnapshot,
+    String? customerGstNumberSnapshot,
+    bool clearGstSnapshot = false,
     DateTime? date,
     List<InvoiceItem>? items,
     List<AdditionalCharge>? additionalCharges,
@@ -87,6 +92,9 @@ class Invoice {
       customerNameSnapshot: customerNameSnapshot ?? this.customerNameSnapshot,
       customerPhoneSnapshot: customerPhoneSnapshot ?? this.customerPhoneSnapshot,
       customerAddressSnapshot: customerAddressSnapshot ?? this.customerAddressSnapshot,
+      customerGstNumberSnapshot: clearGstSnapshot
+          ? null
+          : (customerGstNumberSnapshot ?? this.customerGstNumberSnapshot),
       date: date ?? this.date,
       items: items ?? this.items,
       additionalCharges: additionalCharges ?? this.additionalCharges,
@@ -108,6 +116,8 @@ class Invoice {
       'customerNameSnapshot': customerNameSnapshot,
       'customerPhoneSnapshot': customerPhoneSnapshot,
       'customerAddressSnapshot': customerAddressSnapshot,
+      if (customerGstNumberSnapshot != null && customerGstNumberSnapshot!.trim().isNotEmpty)
+        'customerGstNumberSnapshot': customerGstNumberSnapshot!.trim().toUpperCase(),
       'date': date.toIso8601String(),
       'itemsJson': jsonEncode(items.map((i) => i.toMap()).toList()),
       'chargesJson': jsonEncode(additionalCharges.map((c) => c.toMap()).toList()),
@@ -116,20 +126,53 @@ class Invoice {
       'paidAmount': paidAmount,
       'balanceDue': balanceDue,
       'notes': notes,
+      'paymentStatus': paymentStatus.label,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'invoiceNumber': invoiceNumber,
+      'customerId': customerId,
+      'customerNameSnapshot': customerNameSnapshot,
+      'customerPhoneSnapshot': customerPhoneSnapshot,
+      'customerAddressSnapshot': customerAddressSnapshot,
+      if (customerGstNumberSnapshot != null && customerGstNumberSnapshot!.trim().isNotEmpty)
+        'customerGstNumberSnapshot': customerGstNumberSnapshot!.trim().toUpperCase(),
+      'date': Timestamp.fromDate(date),
+      'items': items.map((i) => i.toMap()).toList(),
+      'additionalCharges': additionalCharges.map((c) => c.toMap()).toList(),
+      'subtotal': subtotal,
+      'total': total,
+      'paidAmount': paidAmount,
+      'balanceDue': balanceDue,
+      'notes': notes,
+      'paymentStatus': paymentStatus.label,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+    };
+  }
+
   factory Invoice.fromMap(Map<String, dynamic> map) {
     List<InvoiceItem> parsedItems = [];
-    if (map['itemsJson'] != null && map['itemsJson'] is String) {
+    if (map['items'] is List) {
+      parsedItems = (map['items'] as List)
+          .map((e) => InvoiceItem.fromMap(e as Map<String, dynamic>))
+          .toList();
+    } else if (map['itemsJson'] != null && map['itemsJson'] is String) {
       final decoded = jsonDecode(map['itemsJson'] as String) as List<dynamic>;
       parsedItems = decoded.map((e) => InvoiceItem.fromMap(e as Map<String, dynamic>)).toList();
     }
 
     List<AdditionalCharge> parsedCharges = [];
-    if (map['chargesJson'] != null && map['chargesJson'] is String) {
+    if (map['additionalCharges'] is List) {
+      parsedCharges = (map['additionalCharges'] as List)
+          .map((e) => AdditionalCharge.fromMap(e as Map<String, dynamic>))
+          .toList();
+    } else if (map['chargesJson'] != null && map['chargesJson'] is String) {
       final decoded = jsonDecode(map['chargesJson'] as String) as List<dynamic>;
       parsedCharges = decoded.map((e) => AdditionalCharge.fromMap(e as Map<String, dynamic>)).toList();
     }
@@ -141,7 +184,10 @@ class Invoice {
       customerNameSnapshot: map['customerNameSnapshot'] as String,
       customerPhoneSnapshot: (map['customerPhoneSnapshot'] as String?) ?? '',
       customerAddressSnapshot: (map['customerAddressSnapshot'] as String?) ?? '',
-      date: DateTime.parse(map['date'] as String),
+      customerGstNumberSnapshot: (map['customerGstNumberSnapshot'] as String?)?.trim(),
+      date: map['date'] is Timestamp
+          ? (map['date'] as Timestamp).toDate()
+          : DateTime.parse(map['date'] as String),
       items: parsedItems,
       additionalCharges: parsedCharges,
       subtotal: (map['subtotal'] as num).toDouble(),
@@ -149,8 +195,19 @@ class Invoice {
       paidAmount: (map['paidAmount'] as num).toDouble(),
       balanceDue: (map['balanceDue'] as num).toDouble(),
       notes: (map['notes'] as String?) ?? '',
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      updatedAt: DateTime.parse(map['updatedAt'] as String),
+      createdAt: map['createdAt'] is Timestamp
+          ? (map['createdAt'] as Timestamp).toDate()
+          : DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] is Timestamp
+          ? (map['updatedAt'] as Timestamp).toDate()
+          : DateTime.parse(map['updatedAt'] as String),
     );
+  }
+
+  factory Invoice.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    final map = Map<String, dynamic>.from(data);
+    map['id'] = (data['id'] as String?) ?? doc.id;
+    return Invoice.fromMap(map);
   }
 }

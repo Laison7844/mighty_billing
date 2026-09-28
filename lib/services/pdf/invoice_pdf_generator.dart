@@ -59,20 +59,35 @@ class InvoicePdfGenerator {
       bold: fontBold,
     );
 
+    final pageTheme = pw.PageTheme(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      theme: theme,
+      buildBackground: (pw.Context context) {
+        return pw.FullPage(
+          ignoreMargins: true,
+          child: pw.Container(color: PdfColors.white),
+        );
+      },
+    );
+
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        theme: theme,
+        pageTheme: pageTheme,
         build: (pw.Context context) {
           return pw.Stack(
             children: [
-              // 1. Watermark in the background
+              // 1. Explicit Solid White Background Layer
+              pw.Positioned.fill(
+                child: pw.Container(color: PdfColors.white),
+              ),
+
+              // 2. Watermark in the background (0.08 opacity for clear visibility on white)
               if (logoImage != null)
                 pw.Positioned.fill(
                   child: pw.Center(
                     child: pw.Opacity(
-                      opacity: 0.05,
+                      opacity: 0.08,
                       child: pw.Image(logoImage, width: 340, height: 340),
                     ),
                   ),
@@ -271,6 +286,18 @@ class InvoicePdfGenerator {
                   pw.Text(
                     invoice.customerAddressSnapshot,
                     style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  ),
+                ],
+                if (invoice.customerGstNumberSnapshot != null &&
+                    invoice.customerGstNumberSnapshot!.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    'GSTIN: ${invoice.customerGstNumberSnapshot}',
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColor.fromHex('#0F172A'),
+                    ),
                   ),
                 ],
               ],

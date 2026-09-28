@@ -34,6 +34,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       TextEditingController();
   final TextEditingController _customerAddressController =
       TextEditingController();
+  final TextEditingController _customerGstController = TextEditingController();
 
   // Date
   DateTime _invoiceDate = DateTime.now();
@@ -61,6 +62,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       _customerNameController.text = existing.customerNameSnapshot;
       _customerPhoneController.text = existing.customerPhoneSnapshot;
       _customerAddressController.text = existing.customerAddressSnapshot;
+      _customerGstController.text = existing.customerGstNumberSnapshot ?? '';
       _invoiceDate = existing.date;
       _notesController.text = existing.notes;
       _paidAmountController.text = existing.paidAmount.toStringAsFixed(2);
@@ -106,6 +108,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     _customerNameController.dispose();
     _customerPhoneController.dispose();
     _customerAddressController.dispose();
+    _customerGstController.dispose();
     _paidAmountController.dispose();
     _notesController.dispose();
     for (final item in _items) {
@@ -289,6 +292,9 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         customerNameSnapshot: _customerNameController.text.trim(),
         customerPhoneSnapshot: _customerPhoneController.text.trim(),
         customerAddressSnapshot: _customerAddressController.text.trim(),
+        customerGstNumberSnapshot: _customerGstController.text.trim().isNotEmpty
+            ? _customerGstController.text.trim().toUpperCase()
+            : null,
         date: _invoiceDate,
         items: finalItems,
         additionalCharges: finalCharges,
@@ -343,6 +349,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Text(
           isEditing
               ? 'Edit Bill (${widget.existingInvoice!.invoiceNumber})'
@@ -362,487 +369,511 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-          children: [
-            // Section 1: Customer & Date
-            _buildSectionCard(
-              title: 'Customer Details',
-              icon: Icons.person_outline,
-              trailing: TextButton.icon(
-                icon: const Icon(Icons.person_add_alt, size: 16),
-                label: const Text('New Customer'),
-                onPressed: () async {
-                  final newCustomer = await showDialog<Customer>(
-                    context: context,
-                    builder: (context) => const CustomerFormDialog(),
-                  );
-                  if (newCustomer != null) {
-                    final repo = ref.read(customerRepositoryProvider);
-                    await repo.saveCustomer(newCustomer);
-                    ref.invalidate(customersProvider);
-                    setState(() {
-                      _selectedCustomerId = newCustomer.id;
-                      _customerNameController.text = newCustomer.name;
-                      _customerPhoneController.text = newCustomer.phone;
-                      _customerAddressController.text = newCustomer.address;
-                    });
-                  }
-                },
-              ),
-              children: [
-                // Quick Select Dropdown
-                customersAsync.when(
-                  data: (customers) {
-                    if (customers.isEmpty && _selectedCustomerId == null) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final menuItems = customers.map((c) {
-                      return DropdownMenuItem(
-                        value: c.id,
-                        child: Text(
-                          '${c.name} ${c.phone.isNotEmpty ? "(${c.phone})" : ""}',
-                        ),
-                      );
-                    }).toList();
-
-                    // If a newly created customer isn't in the async list yet,
-                    // add it to menuItems to prevent dropdown assertion failure
-                    if (_selectedCustomerId != null &&
-                        !customers.any((c) => c.id == _selectedCustomerId)) {
-                      menuItems.insert(
-                        0,
-                        DropdownMenuItem(
-                          value: _selectedCustomerId,
-                          child: Text(
-                            '${_customerNameController.text} ${_customerPhoneController.text.isNotEmpty ? "(${_customerPhoneController.text})" : ""}',
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey(_selectedCustomerId),
-                        initialValue: _selectedCustomerId,
-                        decoration: const InputDecoration(
-                          labelText: 'Select Existing Customer',
-                          prefixIcon: Icon(Icons.people_alt_outlined),
-                        ),
-                        hint: const Text('Choose a customer...'),
-                        items: menuItems,
-                        onChanged: (customerId) {
-                          if (customerId != null) {
-                            final match = customers.where((c) => c.id == customerId);
-                            if (match.isNotEmpty) {
-                              final c = match.first;
-                              setState(() {
-                                _selectedCustomerId = c.id;
-                                _customerNameController.text = c.name;
-                                _customerPhoneController.text = c.phone;
-                                _customerAddressController.text = c.address;
-                              });
-                            }
-                          }
-                        },
-                      ),
+      body: SafeArea(
+        top: false,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            children: [
+              // Section 1: Customer & Date
+              _buildSectionCard(
+                title: 'Customer Details',
+                icon: Icons.person_outline,
+                trailing: TextButton.icon(
+                  icon: const Icon(Icons.person_add_alt, size: 16),
+                  label: const Text('New Customer'),
+                  onPressed: () async {
+                    final newCustomer = await showDialog<Customer>(
+                      context: context,
+                      builder: (context) => const CustomerFormDialog(),
                     );
-                  },
-                  loading: () => const LinearProgressIndicator(),
-                  error: (e, s) => const SizedBox.shrink(),
-                ),
-
-                TextFormField(
-                  controller: _customerNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer Name *',
-                    hintText: 'e.g. Ringle, John',
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Customer name is required';
+                    if (newCustomer != null) {
+                      final repo = ref.read(customerRepositoryProvider);
+                      await repo.saveCustomer(newCustomer);
+                      ref.invalidate(customersProvider);
+                      setState(() {
+                        _selectedCustomerId = newCustomer.id;
+                        _customerNameController.text = newCustomer.name;
+                        _customerPhoneController.text = newCustomer.phone;
+                        _customerAddressController.text = newCustomer.address;
+                        _customerGstController.text =
+                            newCustomer.gstNumber ?? '';
+                      });
                     }
-                    return null;
                   },
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _customerPhoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone',
-                          hintText: '98470 12345',
-                        ),
-                        keyboardType: TextInputType.phone,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectDate,
-                        child: InputDecorator(
+                children: [
+                  // Quick Select Dropdown
+                  customersAsync.when(
+                    data: (customers) {
+                      if (customers.isEmpty && _selectedCustomerId == null) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final menuItems = customers.map((c) {
+                        return DropdownMenuItem(
+                          value: c.id,
+                          child: Text(
+                            '${c.name} ${c.phone.isNotEmpty ? "(${c.phone})" : ""}',
+                          ),
+                        );
+                      }).toList();
+
+                      // If a newly created customer isn't in the async list yet,
+                      // add it to menuItems to prevent dropdown assertion failure
+                      if (_selectedCustomerId != null &&
+                          !customers.any((c) => c.id == _selectedCustomerId)) {
+                        menuItems.insert(
+                          0,
+                          DropdownMenuItem(
+                            value: _selectedCustomerId,
+                            child: Text(
+                              '${_customerNameController.text} ${_customerPhoneController.text.isNotEmpty ? "(${_customerPhoneController.text})" : ""}',
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey(_selectedCustomerId),
+                          initialValue: _selectedCustomerId,
                           decoration: const InputDecoration(
-                            labelText: 'Bill Date',
-                            suffixIcon: Icon(Icons.calendar_month, size: 20),
+                            labelText: 'Select Existing Customer',
+                            prefixIcon: Icon(Icons.people_alt_outlined),
                           ),
-                          child: Text(
-                            DateFormatter.formatShortDate(_invoiceDate),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                          hint: const Text('Choose a customer...'),
+                          items: menuItems,
+                          onChanged: (customerId) {
+                            if (customerId != null) {
+                              final match = customers.where(
+                                (c) => c.id == customerId,
+                              );
+                              if (match.isNotEmpty) {
+                                final c = match.first;
+                                setState(() {
+                                  _selectedCustomerId = c.id;
+                                  _customerNameController.text = c.name;
+                                  _customerPhoneController.text = c.phone;
+                                  _customerAddressController.text = c.address;
+                                  _customerGstController.text =
+                                      c.gstNumber ?? '';
+                                });
+                              }
+                            }
+                          },
                         ),
-                      ),
+                      );
+                    },
+                    loading: () => const LinearProgressIndicator(),
+                    error: (e, s) => const SizedBox.shrink(),
+                  ),
+
+                  TextFormField(
+                    controller: _customerNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer Name *',
+                      hintText: 'e.g.John',
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _customerAddressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Site / Delivery Address',
-                    hintText: 'e.g. Green Valley Site, Plot #12',
+                    textCapitalization: TextCapitalization.words,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Customer name is required';
+                      }
+                      return null;
+                    },
                   ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Section 2: Items
-            _buildSectionCard(
-              title: 'Items',
-              icon: Icons.view_in_ar_rounded,
-              trailing: ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Item'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => _addNewItem(),
-              ),
-              children: [
-                // Quick add product chips from database
-                productsAsync.when(
-                  data: (products) {
-                    if (products.isEmpty) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Quick Add Product:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: products.map((p) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: ActionChip(
-                                    avatar: const Icon(
-                                      Icons.add,
-                                      size: 14,
-                                      color: AppColors.accent,
-                                    ),
-                                    label: Text(
-                                      '${p.name} (₹${p.defaultRate.toInt()})',
-                                    ),
-                                    backgroundColor: AppColors.surfaceVariant,
-                                    labelStyle: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    onPressed: () => _addNewItem(p),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (e, s) => const SizedBox.shrink(),
-                ),
-
-                // Item Rows
-                ..._items.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  return _buildItemRow(index, item, productsAsync.value ?? []);
-                }),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Section 3: Additional Charges
-            _buildSectionCard(
-              title: 'Additional Charges',
-              icon: Icons.local_shipping_outlined,
-              trailing: ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Charge'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => _addCharge(),
-              ),
-              children: [
-                // Quick suggested charges chips
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                  const SizedBox(height: 10),
+                  Row(
                     children: [
-                      ActionChip(
-                        avatar: const Icon(Icons.add, size: 14),
-                        label: const Text('Vehicle Charge'),
-                        onPressed: () => _addCharge('Vehicle Charge', 300),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.add, size: 14),
-                        label: const Text('Loading Charge'),
-                        onPressed: () => _addCharge('Loading Charge', 200),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.add, size: 14),
-                        label: const Text('Unloading Charge'),
-                        onPressed: () => _addCharge('Unloading Charge', 200),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.add, size: 14),
-                        label: const Text(' Other Charges'),
-                        onPressed: () => _addCharge('Other Charges', 100),
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (_charges.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'No additional charges added (Vehicle, Loading, etc.)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  )
-                else
-                  ..._charges.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final charge = entry.value;
-                    return _buildChargeRow(index, charge);
-                  }),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Section 4: Payment & Summary
-            _buildSectionCard(
-              title: 'Payment & Total',
-              icon: Icons.payments_outlined,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _summaryLine('Subtotal (Items)', _subtotal),
-                      if (_additionalChargesTotal > 0) ...[
-                        const SizedBox(height: 6),
-                        _summaryLine(
-                          'Additional Charges',
-                          _additionalChargesTotal,
+                      Expanded(
+                        child: TextFormField(
+                          controller: _customerPhoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone',
+                            hintText: '98470 12345',
+                          ),
+                          keyboardType: TextInputType.phone,
                         ),
-                      ],
-                      const Divider(height: 18),
-                      _summaryLine(
-                        'TOTAL AMOUNT',
-                        _total,
-                        isBold: true,
-                        fontSize: 17,
-                        color: AppColors.primary,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Paid Amount Field & Shortcut Buttons
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 6,
-                      child: TextFormField(
-                        controller: _paidAmountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Paid Amount (₹)',
-                          prefixText: '₹ ',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        onChanged: (val) {
-                          setState(() {}); // Recalculate balance
-                        },
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) return null;
-                          final parsed = double.tryParse(val.trim());
-                          if (parsed == null || parsed < 0) {
-                            return 'Invalid paid amount';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        children: [
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 12,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: _selectDate,
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Bill Date',
+                              suffixIcon: Icon(Icons.calendar_month, size: 20),
+                            ),
+                            child: Text(
+                              DateFormatter.formatShortDate(_invoiceDate),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _paidAmountController.text = _total
-                                    .toStringAsFixed(2);
-                              });
-                            },
-                            child: const Text(
-                              'Paid Full',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _customerAddressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Site / Delivery Address',
+                      hintText: 'e.g. Green Valley Site, Plot #12',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _customerGstController,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer GSTIN (Optional)',
+                      hintText: 'e.g. 32AAAAA0000A1Z5',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Section 2: Items
+              _buildSectionCard(
+                title: 'Items',
+                icon: Icons.view_in_ar_rounded,
+                trailing: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add Item'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => _addNewItem(),
+                ),
+                children: [
+                  // Quick add product chips from database
+                  productsAsync.when(
+                    data: (products) {
+                      if (products.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Quick Add Product:',
                               style: TextStyle(
                                 fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
+                            const SizedBox(height: 6),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: products.map((p) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ActionChip(
+                                      avatar: const Icon(
+                                        Icons.add,
+                                        size: 14,
+                                        color: AppColors.accent,
+                                      ),
+                                      label: Text(p.name),
+                                      backgroundColor: AppColors.surfaceVariant,
+                                      labelStyle: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      onPressed: () => _addNewItem(p),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _paidAmountController.text = '0.00';
-                              });
-                            },
-                            child: const Text(
-                              'Unpaid (₹0)',
-                              style: TextStyle(fontSize: 11),
-                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (e, s) => const SizedBox.shrink(),
+                  ),
+
+                  // Item Rows
+                  ..._items.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final item = entry.value;
+                    return _buildItemRow(
+                      index,
+                      item,
+                      productsAsync.value ?? [],
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Section 3: Additional Charges
+              _buildSectionCard(
+                title: 'Additional Charges',
+                icon: Icons.local_shipping_outlined,
+                trailing: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add Charge'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => _addCharge(),
+                ),
+                children: [
+                  // Quick suggested charges chips
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 14),
+                          label: const Text('Vehicle Charge'),
+                          onPressed: () => _addCharge('Vehicle Charge', 300),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 14),
+                          label: const Text('Loading Charge'),
+                          onPressed: () => _addCharge('Loading Charge', 200),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 14),
+                          label: const Text('Unloading Charge'),
+                          onPressed: () => _addCharge('Unloading Charge', 200),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 14),
+                          label: const Text(' Other Charges'),
+                          onPressed: () => _addCharge('Other Charges', 100),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (_charges.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'No additional charges added (Vehicle, Loading, etc.)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else
+                    ..._charges.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final charge = entry.value;
+                      return _buildChargeRow(index, charge);
+                    }),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Section 4: Payment & Summary
+              _buildSectionCard(
+                title: 'Payment & Total',
+                icon: Icons.payments_outlined,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        _summaryLine('Subtotal (Items)', _subtotal),
+                        if (_additionalChargesTotal > 0) ...[
+                          const SizedBox(height: 6),
+                          _summaryLine(
+                            'Additional Charges',
+                            _additionalChargesTotal,
                           ),
                         ],
+                        const Divider(height: 18),
+                        _summaryLine(
+                          'TOTAL AMOUNT',
+                          _total,
+                          isBold: true,
+                          fontSize: 17,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Paid Amount Field & Shortcut Buttons
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: TextFormField(
+                          controller: _paidAmountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Paid Amount (₹)',
+                            prefixText: '₹ ',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          onChanged: (val) {
+                            setState(() {}); // Recalculate balance
+                          },
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return null;
+                            final parsed = double.tryParse(val.trim());
+                            if (parsed == null || parsed < 0) {
+                              return 'Invalid paid amount';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          children: [
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _paidAmountController.text = _total
+                                      .toStringAsFixed(2);
+                                });
+                              },
+                              child: const Text(
+                                'Paid Full',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _paidAmountController.text = '0.00';
+                                });
+                              },
+                              child: const Text(
+                                'Unpaid (₹0)',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Balance Due Banner
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _balanceDue > 0
+                          ? AppColors.unpaidContainer
+                          : AppColors.paidContainer,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _balanceDue > 0
+                            ? const Color(0xFFFECACA)
+                            : const Color(0xFFA7F3D0),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Balance Due Banner
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _balanceDue > 0
-                        ? AppColors.unpaidContainer
-                        : AppColors.paidContainer,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _balanceDue > 0
-                          ? const Color(0xFFFECACA)
-                          : const Color(0xFFA7F3D0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'BALANCE DUE',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'BALANCE DUE',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _balanceDue > 0
+                                ? AppColors.unpaidRed
+                                : AppColors.paidGreen,
+                          ),
+                        ),
+                        MoneyText(
+                          amount: _balanceDue,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                           color: _balanceDue > 0
                               ? AppColors.unpaidRed
                               : AppColors.paidGreen,
                         ),
-                      ),
-                      MoneyText(
-                        amount: _balanceDue,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: _balanceDue > 0
-                            ? AppColors.unpaidRed
-                            : AppColors.paidGreen,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-                TextFormField(
-                  controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes / Remarks (Optional)',
-                    hintText: 'e.g. Delivery by evening, site supervisor John',
-                    prefixIcon: Icon(Icons.notes_outlined),
+                  TextFormField(
+                    controller: _notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes / Remarks (Optional)',
+                      hintText:
+                          'e.g. Delivery by evening, site supervisor John',
+                      prefixIcon: Icon(Icons.notes_outlined),
+                    ),
+                    maxLines: 2,
                   ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+                ],
+              ),
+              const SizedBox(height: 24),
 
-            // Submit Button
-            PrimaryButton(
-              label: isEditing ? 'Update Invoice' : 'Save & Generate Bill',
-              icon: Icons.receipt_long,
-              isLoading: _isSaving,
-              onPressed: _saveInvoice,
-            ),
-          ],
+              // Submit Button
+              PrimaryButton(
+                label: isEditing ? 'Update Invoice' : 'Save & Generate Bill',
+                icon: Icons.receipt_long,
+                isLoading: _isSaving,
+                onPressed: _saveInvoice,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -991,7 +1022,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   controller: item.rateController,
                   decoration: const InputDecoration(
                     labelText: 'Rate (₹)',
-                    hintText: '34.00',
+                    hintText: '',
                     prefixText: '₹',
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(

@@ -22,23 +22,32 @@ class InvoiceBillCard extends StatelessWidget {
     return Card(
       elevation: 2,
       clipBehavior: Clip.antiAlias,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.border, width: 1.2),
       ),
-      child: Stack(
-        children: [
-          // Background Watermark
-          Positioned.fill(
-            child: Center(
-              child: LogoWidget(
-                size: 260,
-                customPath: settings.customLogoPath,
-                isWatermark: true,
-                opacity: 0.05,
+      child: Container(
+        color: Colors.white,
+        child: Stack(
+          children: [
+            // 1. Explicit Solid White Background Layer
+            const Positioned.fill(
+              child: ColoredBox(color: Colors.white),
+            ),
+
+            // 2. Background Watermark (0.08 opacity for clear visibility)
+            Positioned.fill(
+              child: Center(
+                child: LogoWidget(
+                  size: 260,
+                  customPath: settings.customLogoPath,
+                  isWatermark: true,
+                  opacity: 0.08,
+                ),
               ),
             ),
-          ),
 
           // Invoice Content
           Padding(
@@ -94,6 +103,7 @@ class InvoiceBillCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -219,6 +229,14 @@ class InvoiceBillCard extends StatelessWidget {
                   Text(
                     invoice.customerAddressSnapshot,
                     style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                ],
+                if (invoice.customerGstNumberSnapshot != null &&
+                    invoice.customerGstNumberSnapshot!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'GSTIN: ${invoice.customerGstNumberSnapshot}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                 ],
               ],

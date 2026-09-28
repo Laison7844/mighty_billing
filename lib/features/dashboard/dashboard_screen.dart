@@ -59,7 +59,9 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
-      body: RefreshIndicator(
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(dashboardMetricsProvider);
           ref.invalidate(invoicesProvider);
@@ -253,7 +255,8 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _heroMetricCard({

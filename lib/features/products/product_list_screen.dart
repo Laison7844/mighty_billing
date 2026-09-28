@@ -16,9 +16,7 @@ class ProductListScreen extends ConsumerWidget {
     final searchQuery = ref.watch(productSearchQueryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Products & Rates'),
-      ),
+      appBar: AppBar(centerTitle: true, title: const Text('Products & Rates')),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_product_list',
         backgroundColor: AppColors.primary,
@@ -42,7 +40,9 @@ class ProductListScreen extends ConsumerWidget {
           }
         },
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // Search Bar
           Padding(
@@ -50,12 +50,16 @@ class ProductListScreen extends ConsumerWidget {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search products by name or unit...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.textSecondary,
+                ),
                 suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
                         onPressed: () {
-                          ref.read(productSearchQueryProvider.notifier).state = '';
+                          ref.read(productSearchQueryProvider.notifier).state =
+                              '';
                         },
                       )
                     : null,
@@ -73,7 +77,9 @@ class ProductListScreen extends ConsumerWidget {
                 if (products.isEmpty) {
                   return EmptyStateView(
                     icon: Icons.inventory_2_outlined,
-                    title: searchQuery.isNotEmpty ? 'No products found' : 'No products yet',
+                    title: searchQuery.isNotEmpty
+                        ? 'No products found'
+                        : 'No products yet',
                     message: searchQuery.isNotEmpty
                         ? 'Try searching with a different product name.'
                         : 'Add hollow blocks, interlocks, or custom materials.',
@@ -97,7 +103,8 @@ class ProductListScreen extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                   itemCount: products.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final product = products[index];
                     return Card(
@@ -119,11 +126,17 @@ class ProductListScreen extends ConsumerWidget {
                         ),
                         title: Text(
                           product.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                         subtitle: Text(
                           'Unit: ${product.unit}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -134,7 +147,10 @@ class ProductListScreen extends ConsumerWidget {
                               children: [
                                 const Text(
                                   'Default Rate',
-                                  style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.textMuted,
+                                  ),
                                 ),
                                 MoneyText(
                                   amount: product.defaultRate,
@@ -145,15 +161,21 @@ class ProductListScreen extends ConsumerWidget {
                               ],
                             ),
                             PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: AppColors.textSecondary,
+                              ),
                               onSelected: (action) async {
                                 if (action == 'edit') {
                                   final updated = await showDialog<Product>(
                                     context: context,
-                                    builder: (context) => ProductFormDialog(product: product),
+                                    builder: (context) =>
+                                        ProductFormDialog(product: product),
                                   );
                                   if (updated != null) {
-                                    final repo = ref.read(productRepositoryProvider);
+                                    final repo = ref.read(
+                                      productRepositoryProvider,
+                                    );
                                     await repo.updateProduct(updated);
                                     ref.invalidate(productsProvider);
                                   }
@@ -162,22 +184,31 @@ class ProductListScreen extends ConsumerWidget {
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('Delete Product?'),
-                                      content: Text('Are you sure you want to delete ${product.name}? Old invoices will not be affected.'),
+                                      content: Text(
+                                        'Are you sure you want to delete ${product.name}? Old invoices will not be affected.',
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
                                           child: const Text('Cancel'),
                                         ),
                                         ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.unpaidRed),
-                                          onPressed: () => Navigator.of(context).pop(true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                AppColors.unpaidRed,
+                                          ),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
                                           child: const Text('Delete'),
                                         ),
                                       ],
                                     ),
                                   );
                                   if (confirm == true) {
-                                    final repo = ref.read(productRepositoryProvider);
+                                    final repo = ref.read(
+                                      productRepositoryProvider,
+                                    );
                                     await repo.deleteProduct(product.id);
                                     ref.invalidate(productsProvider);
                                   }
@@ -198,9 +229,18 @@ class ProductListScreen extends ConsumerWidget {
                                   value: 'delete',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.delete_outline, size: 18, color: AppColors.unpaidRed),
+                                      Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: AppColors.unpaidRed,
+                                      ),
                                       SizedBox(width: 8),
-                                      Text('Delete', style: TextStyle(color: AppColors.unpaidRed)),
+                                      Text(
+                                        'Delete',
+                                        style: TextStyle(
+                                          color: AppColors.unpaidRed,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -219,6 +259,7 @@ class ProductListScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }

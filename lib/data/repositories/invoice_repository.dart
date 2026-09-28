@@ -1,7 +1,7 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/config/company_config.dart';
 import '../../core/utils/financial_year_util.dart';
 import '../../models/invoice.dart';
-import '../database/app_database.dart';
 
 enum InvoiceSortOption {
   newest,
@@ -10,131 +10,193 @@ enum InvoiceSortOption {
 }
 
 class InvoiceRepository {
-  final AppDatabase dbProvider;
-
-  InvoiceRepository({AppDatabase? dbProvider})
-      : dbProvider = dbProvider ?? AppDatabase.instance;
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      CompanyConfig.invoicesCollection();
 
   Future<List<Invoice>> getAllInvoices({
     String? searchQuery,
     PaymentStatus? statusFilter,
     InvoiceSortOption sortOption = InvoiceSortOption.newest,
   }) async {
-    final db = await dbProvider.database;
-    String orderBy;
-    switch (sortOption) {
-      case InvoiceSortOption.newest:
-        orderBy = 'date DESC, createdAt DESC';
-        break;
-      case InvoiceSortOption.oldest:
-        orderBy = 'date ASC, createdAt ASC';
-        break;
-      case InvoiceSortOption.highestAmount:
-        orderBy = 'total DESC';
-        break;
+    try {
+      final snapshot = await _collection.get();
+      List<Invoice> invoices = snapshot.docs
+          .map((doc) => Invoice.fromFirestore(doc))
+          .toList();
+
+      // Search filter
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final q = searchQuery.trim().toLowerCase();
+        invoices = invoices.where((inv) {
+          final numberMatch = inv.invoiceNumber.toLowerCase().contains(q);
+          final nameMatch = inv.customerNameSnapshot.toLowerCase().contains(q);
+          final phoneMatch = inv.customerPhoneSnapshot.toLowerCase().contains(q);
+          final gstMatch = (inv.customerGstNumberSnapshot ?? '').toLowerCase().contains(q);
+          return numberMatch || nameMatch || phoneMatch || gstMatch;
+        }).toList();
+      }
+
+      // Status filter
+      if (statusFilter != null) {
+        invoices = invoices.where((inv) => inv.paymentStatus == statusFilter).toList();
+      }
+
+      // Sorting
+      switch (sortOption) {
+        case InvoiceSortOption.newest:
+          invoices.sort((a, b) {
+            final cmp = b.date.compareTo(a.date);
+            if (cmp != 0) return cmp;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          break;
+        case InvoiceSortOption.oldest:
+          invoices.sort((a, b) {
+            final cmp = a.date.compareTo(b.date);
+            if (cmp != 0) return cmp;
+            return a.createdAt.compareTo(b.createdAt);
+          });
+          break;
+        case InvoiceSortOption.highestAmount:
+          invoices.sort((a, b) => b.total.compareTo(a.total));
+          break;
+      }
+
+      return invoices;
+    } catch (e) {
+      return [];
     }
-
-    List<Map<String, dynamic>> results;
-    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      final q = '%${searchQuery.trim()}%';
-      results = await db.query(
-        'invoices',
-        where: 'invoiceNumber LIKE ? OR customerNameSnapshot LIKE ? OR customerPhoneSnapshot LIKE ?',
-        whereArgs: [q, q, q],
-        orderBy: orderBy,
-      );
-    } else {
-      results = await db.query('invoices', orderBy: orderBy);
-    }
-
-    final invoices = results.map((map) => Invoice.fromMap(map)).toList();
-
-    if (statusFilter != null) {
-      return invoices.where((inv) => inv.paymentStatus == statusFilter).toList();
-    }
-
-    return invoices;
   }
 
   Future<List<Invoice>> getInvoicesByCustomerId(String customerId) async {
-    final db = await dbProvider.database;
-    final results = await db.query(
-      'invoices',
-      where: 'customerId = ?',
-      whereArgs: [customerId],
-      orderBy: 'date DESC, createdAt DESC',
-    );
-    return results.map((map) => Invoice.fromMap(map)).toList();
+    try {
+      final snapshot = await _collection
+          .where('customerId', isEqualTo: customerId)
+          .get();
+
+      final invoices = snapshot.docs
+          .map((doc) => Invoice.fromFirestore(doc))
+          .toList();
+
+      invoices.sort((a, b) {
+        final cmp = b.date.compareTo(a.date);
+        if (cmp != 0) return cmp;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+      return invoices;
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<Invoice?> getInvoiceById(String id) async {
-    final db = await dbProvider.database;
-    final results = await db.query('invoices', where: 'id = ?', whereArgs: [id]);
-    if (results.isEmpty) return null;
-    return Invoice.fromMap(results.first);
+    try {
+      final doc = await _collection.doc(id).get();
+      if (!doc.exists) return null;
+      return Invoice.fromFirestore(doc);
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<Invoice> saveInvoice(Invoice invoice) async {
-    final db = await dbProvider.database;
-    await db.insert(
-      'invoices',
-      invoice.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    await _collection.doc(invoice.id).set(
+      invoice.toFirestore(),
+      SetOptions(merge: true),
     );
     return invoice;
   }
 
   Future<void> updateInvoice(Invoice invoice) async {
-    final db = await dbProvider.database;
-    await db.update(
-      'invoices',
-      invoice.toMap(),
-      where: 'id = ?',
-      whereArgs: [invoice.id],
+    await _collection.doc(invoice.id).set(
+      invoice.toFirestore(),
+      SetOptions(merge: true),
     );
   }
 
   Future<void> deleteInvoice(String id) async {
-    final db = await dbProvider.database;
-    await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    await _collection.doc(id).delete();
   }
 
   Future<void> deleteAllInvoices() async {
-    final db = await dbProvider.database;
-    await db.delete('invoices');
+    final snapshot = await _collection.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 
-  /// Automatically generates the next unique invoice number for the given financial year and prefix
+  /// Automatically generates the next unique invoice number using a safe Firestore transaction
   Future<String> getNextInvoiceNumber({
     String prefix = 'INV',
     String? financialYear,
     int startingSequence = 1,
   }) async {
-    final db = await dbProvider.database;
     final fy = financialYear ?? FinancialYearUtil.getFinancialYear();
     final cleanPrefix = prefix.trim().toUpperCase();
-    final searchPattern = '$cleanPrefix/$fy/%';
+    final counterRef = CompanyConfig.invoiceCounterDoc();
 
-    final results = await db.query(
-      'invoices',
-      columns: ['invoiceNumber'],
-      where: 'invoiceNumber LIKE ?',
-      whereArgs: [searchPattern],
-    );
+    int nextSeq = startingSequence;
 
-    int maxSeq = startingSequence - 1;
-    for (final row in results) {
-      final invNum = row['invoiceNumber'] as String? ?? '';
-      final parts = invNum.split('/');
-      if (parts.length >= 3) {
-        final seqPart = int.tryParse(parts.last);
-        if (seqPart != null && seqPart > maxSeq) {
-          maxSeq = seqPart;
+    try {
+      nextSeq = await FirebaseFirestore.instance.runTransaction<int>((transaction) async {
+        final snapshot = await transaction.get(counterRef);
+        if (!snapshot.exists) {
+          final initialSeq = startingSequence;
+          transaction.set(counterRef, {
+            'currentNumber': initialSeq,
+            'financialYear': fy,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          return initialSeq;
         }
+
+        final data = snapshot.data();
+        final storedFy = data?['financialYear'] as String? ?? fy;
+        final currentNumber = (data?['currentNumber'] as num?)?.toInt() ?? 0;
+
+        int calcSeq;
+        if (storedFy != fy) {
+          // New financial year - reset counter to starting sequence
+          calcSeq = startingSequence;
+        } else {
+          calcSeq = currentNumber < (startingSequence - 1)
+              ? startingSequence
+              : currentNumber + 1;
+        }
+
+        transaction.set(counterRef, {
+          'currentNumber': calcSeq,
+          'financialYear': fy,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        return calcSeq;
+      });
+    } catch (e) {
+      // Offline or network fallback: inspect cached counter or highest invoice in cache
+      try {
+        final doc = await counterRef.get(const GetOptions(source: Source.cache));
+        int currentNumber = 0;
+        if (doc.exists) {
+          currentNumber = (doc.data()?['currentNumber'] as num?)?.toInt() ?? 0;
+        }
+        nextSeq = currentNumber < (startingSequence - 1)
+            ? startingSequence
+            : currentNumber + 1;
+        // Attempt local cache update
+        await counterRef.set({
+          'currentNumber': nextSeq,
+          'financialYear': fy,
+          'updatedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        nextSeq = startingSequence;
       }
     }
 
-    final nextSeq = maxSeq + 1;
     return FinancialYearUtil.formatInvoiceNumber(
       prefix: cleanPrefix,
       financialYear: fy,
@@ -144,14 +206,10 @@ class InvoiceRepository {
 
   /// Dashboard metrics
   Future<Map<String, dynamic>> getDashboardMetrics() async {
-    final db = await dbProvider.database;
+    final allInvoices = await getAllInvoices();
     final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day).toIso8601String();
-    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
-
-    // Total bills count & total outstanding
-    final allInvoicesRaw = await db.query('invoices');
-    final allInvoices = allInvoicesRaw.map((e) => Invoice.fromMap(e)).toList();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
     double totalOutstanding = 0;
     double todaySales = 0;
@@ -159,20 +217,18 @@ class InvoiceRepository {
 
     for (final inv in allInvoices) {
       totalOutstanding += inv.balanceDue;
-      final invDateStr = inv.date.toIso8601String();
-      if (invDateStr.compareTo(startOfToday) >= 0 && invDateStr.compareTo(endOfToday) <= 0) {
+      if (inv.date.isAfter(startOfToday.subtract(const Duration(seconds: 1))) &&
+          inv.date.isBefore(endOfToday.add(const Duration(seconds: 1)))) {
         todaySales += inv.total;
         todayBillsCount++;
       }
     }
 
-    // Recent invoices (up to 5)
-    final recentInvoicesRaw = await db.query(
-      'invoices',
-      orderBy: 'createdAt DESC',
-      limit: 5,
-    );
-    final recentInvoices = recentInvoicesRaw.map((e) => Invoice.fromMap(e)).toList();
+    // Sort newest first for recent invoices
+    final sortedInvoices = List<Invoice>.from(allInvoices)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    final recentInvoices = sortedInvoices.take(5).toList();
 
     return {
       'totalBills': allInvoices.length,

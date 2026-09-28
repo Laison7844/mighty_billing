@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909807510132",
+    "project_id": "mighty-billing",
+    "storage_bucket": "mighty-billing.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909807510132:android:7dac36e8af2c684fe4e721",
+        "android_client_info": {
+          "package_name": "com.example.billing"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAepEQrnrO3WkcbsGf_UhU4kcYzTmTxG7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

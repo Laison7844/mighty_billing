@@ -89,6 +89,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Text(_currentCustomer.name),
         actions: [
           IconButton(
@@ -103,7 +104,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Invoice>>(
+      body: SafeArea(
+        top: false,
+        child: FutureBuilder<List<Invoice>>(
         future: invoiceRepo.getInvoicesByCustomerId(_currentCustomer.id),
         builder: (context, snapshot) {
           final invoices = snapshot.data ?? [];
@@ -119,144 +122,161 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
             totalOutstanding += inv.balanceDue;
           }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Info Card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppColors.accentContainer,
-                              child: Text(
-                                _currentCustomer.name.isNotEmpty
-                                    ? _currentCustomer.name[0].toUpperCase()
-                                    : 'C',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.onAccentContainer,
+          return SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Info Card
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: AppColors.accentContainer,
+                                child: Text(
+                                  _currentCustomer.name.isNotEmpty
+                                      ? _currentCustomer.name[0].toUpperCase()
+                                      : 'C',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.onAccentContainer,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _currentCustomer.name,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  if (_currentCustomer.phone.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     Text(
-                                      _currentCustomer.phone,
+                                      _currentCustomer.name,
                                       style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.textSecondary,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
+                                    if (_currentCustomer.phone.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _currentCustomer.phone,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_currentCustomer.address.isNotEmpty) ...[
-                          const Divider(height: 24),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.location_on_outlined, size: 18, color: AppColors.textSecondary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _currentCustomer.address,
-                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                 ),
                               ),
                             ],
                           ),
+                          if (_currentCustomer.address.isNotEmpty) ...[
+                            const Divider(height: 24),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.location_on_outlined, size: 18, color: AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentCustomer.address,
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (_currentCustomer.gstNumber != null && _currentCustomer.gstNumber!.trim().isNotEmpty) ...[
+                            if (_currentCustomer.address.isEmpty) const Divider(height: 24) else const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.badge_outlined, size: 18, color: AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'GSTIN: ${_currentCustomer.gstNumber}',
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Financial Summary Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: _statCard('Total Billed', totalBilled, AppColors.primary),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _statCard('Total Paid', totalPaid, AppColors.paidGreen),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _statCard('Outstanding', totalOutstanding, totalOutstanding > 0 ? AppColors.unpaidRed : AppColors.paidGreen),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Invoices Section Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Customer Invoices',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
                       ),
                     ),
-                    Text(
-                      '${invoices.length} Bills',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                  ),
+                  const SizedBox(height: 16),
 
-                if (isLoading)
-                  const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
-                else if (invoices.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      'No invoices yet for this customer.',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  )
-                else
-                  ...invoices.map((inv) => _invoiceItemCard(inv)),
-              ],
+                  // Financial Summary Cards
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _statCard('Total Billed', totalBilled, AppColors.primary),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _statCard('Total Paid', totalPaid, AppColors.paidGreen),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _statCard('Outstanding', totalOutstanding, totalOutstanding > 0 ? AppColors.unpaidRed : AppColors.paidGreen),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Invoices Section Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Customer Invoices',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${invoices.length} Bills',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (isLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+                  else if (invoices.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'No invoices yet for this customer.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    )
+                  else
+                    ...invoices.map((inv) => _invoiceItemCard(inv)),
+                ],
+              ),
             ),
           );
         },
+        ),
       ),
     );
   }
