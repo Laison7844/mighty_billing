@@ -5,6 +5,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/financial_year_util.dart';
 import '../../models/company_settings.dart';
+import '../../services/migration/firebase_migration_service.dart';
 import '../../widgets/logo_widget.dart';
 import '../../widgets/primary_button.dart';
 
@@ -461,6 +462,64 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.inventory_2_outlined,
+                                size: 16,
+                                color: AppColors.unpaidRed,
+                              ),
+                              label: const Text(
+                                'Clear Products',
+                                style: TextStyle(
+                                  color: AppColors.unpaidRed,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: AppColors.unpaidRed.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                              ),
+                              onPressed: _confirmClearProducts,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(
+                                Icons.delete_sweep_outlined,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                'Purge Test Data',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.unpaidRed,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                              ),
+                              onPressed: _confirmPurgeTestData,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 30),
@@ -588,6 +647,92 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Customer directory cleared.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmClearProducts() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear All Products?'),
+        content: const Text(
+          'This will permanently remove all product items from your catalog. Previously generated invoices will retain their product snapshot data.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.unpaidRed,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Clear Products',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final productRepo = ref.read(productRepositoryProvider);
+      await productRepo.deleteAllProducts();
+      ref.invalidate(productsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product catalog cleared.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmPurgeTestData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Purge All Test Data?'),
+        content: const Text(
+          'This will immediately remove demo masonry products and sample customer accounts from both local storage and cloud database.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.unpaidRed,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Purge Test Data',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await FirebaseMigrationService.purgeTestData();
+      ref.invalidate(productsProvider);
+      ref.invalidate(customersProvider);
+      ref.invalidate(invoicesProvider);
+      ref.invalidate(dashboardMetricsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Test data purged successfully. Ready for live business use!',
+            ),
+          ),
         );
       }
     }

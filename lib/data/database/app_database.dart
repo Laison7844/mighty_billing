@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:uuid/uuid.dart';
 
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._init();
@@ -49,6 +48,11 @@ class AppDatabase {
         await db.delete(
           'customers',
           where: "phone IN ('98470 12345', '94471 56789') OR name IN ('Ringle', 'John')",
+        );
+        // Automatically purge any lingering demo test products
+        await db.delete(
+          'products',
+          where: "name IN ('4 inch Block', '6 inch Block', '8 inch Block', 'Solid Concrete Block', 'Concrete Paver Block', 'Fly Ash Brick')",
         );
       },
     );
@@ -97,23 +101,6 @@ class AppDatabase {
         updatedAt TEXT NOT NULL
       )
     ''');
-
-    // Seed standard masonry products catalog
-    final now = DateTime.now().toIso8601String();
-    const uuid = Uuid();
-
-    final defaultProducts = [
-      {'id': uuid.v4(), 'name': '4 inch Block', 'unit': 'Nos', 'defaultRate': 34.0, 'createdAt': now, 'updatedAt': now},
-      {'id': uuid.v4(), 'name': '6 inch Block', 'unit': 'Nos', 'defaultRate': 42.0, 'createdAt': now, 'updatedAt': now},
-      {'id': uuid.v4(), 'name': '8 inch Block', 'unit': 'Nos', 'defaultRate': 48.0, 'createdAt': now, 'updatedAt': now},
-      {'id': uuid.v4(), 'name': 'Solid Concrete Block', 'unit': 'Nos', 'defaultRate': 38.0, 'createdAt': now, 'updatedAt': now},
-      {'id': uuid.v4(), 'name': 'Concrete Paver Block', 'unit': 'Sq.Ft', 'defaultRate': 55.0, 'createdAt': now, 'updatedAt': now},
-      {'id': uuid.v4(), 'name': 'Fly Ash Brick', 'unit': 'Nos', 'defaultRate': 8.5, 'createdAt': now, 'updatedAt': now},
-    ];
-
-    for (final p in defaultProducts) {
-      await db.insert('products', p);
-    }
   }
 
   Future<void> close() async {

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/config/company_config.dart';
 import '../../models/customer.dart';
+import '../database/app_database.dart';
 
 class CustomerRepository {
   CollectionReference<Map<String, dynamic>> get _collection =>
@@ -57,10 +58,18 @@ class CustomerRepository {
   }
 
   Future<void> deleteCustomer(String id) async {
+    try {
+      final db = await AppDatabase.instance.database;
+      await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
     await _collection.doc(id).delete();
   }
 
   Future<void> deleteAllCustomers() async {
+    try {
+      final db = await AppDatabase.instance.database;
+      await db.delete('customers');
+    } catch (_) {}
     final snapshot = await _collection.get();
     final batch = FirebaseFirestore.instance.batch();
     for (final doc in snapshot.docs) {

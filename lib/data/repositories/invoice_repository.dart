@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/config/company_config.dart';
 import '../../core/utils/financial_year_util.dart';
 import '../../models/invoice.dart';
+import '../database/app_database.dart';
 
 enum InvoiceSortOption {
   newest,
@@ -116,10 +117,18 @@ class InvoiceRepository {
   }
 
   Future<void> deleteInvoice(String id) async {
+    try {
+      final db = await AppDatabase.instance.database;
+      await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
     await _collection.doc(id).delete();
   }
 
   Future<void> deleteAllInvoices() async {
+    try {
+      final db = await AppDatabase.instance.database;
+      await db.delete('invoices');
+    } catch (_) {}
     final snapshot = await _collection.get();
     final batch = FirebaseFirestore.instance.batch();
     for (final doc in snapshot.docs) {

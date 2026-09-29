@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import '../../core/config/company_config.dart';
 import '../../core/utils/financial_year_util.dart';
 import '../../data/database/app_database.dart';
@@ -60,28 +59,6 @@ class FirebaseMigrationService {
           }
           await batch.commit();
           debugPrint('[Migration] Migrated ${localProductsRaw.length} products to Firestore.');
-        } else {
-          // If no products in local database, check if Firestore has products
-          final snapshot = await productCollection.limit(1).get();
-          if (snapshot.docs.isEmpty) {
-            // Seed default catalog
-            final now = DateTime.now();
-            const uuid = Uuid();
-            final defaultProducts = [
-              Product(id: uuid.v4(), name: '4 inch Block', unit: 'Nos', defaultRate: 34.0, createdAt: now, updatedAt: now),
-              Product(id: uuid.v4(), name: '6 inch Block', unit: 'Nos', defaultRate: 42.0, createdAt: now, updatedAt: now),
-              Product(id: uuid.v4(), name: '8 inch Block', unit: 'Nos', defaultRate: 48.0, createdAt: now, updatedAt: now),
-              Product(id: uuid.v4(), name: 'Solid Concrete Block', unit: 'Nos', defaultRate: 38.0, createdAt: now, updatedAt: now),
-              Product(id: uuid.v4(), name: 'Concrete Paver Block', unit: 'Sq.Ft', defaultRate: 55.0, createdAt: now, updatedAt: now),
-              Product(id: uuid.v4(), name: 'Fly Ash Brick', unit: 'Nos', defaultRate: 8.5, createdAt: now, updatedAt: now),
-            ];
-            final batch = FirebaseFirestore.instance.batch();
-            for (final p in defaultProducts) {
-              batch.set(productCollection.doc(p.id), p.toFirestore());
-            }
-            await batch.commit();
-            debugPrint('[Migration] Seeded default products to Firestore.');
-          }
         }
       } catch (e) {
         debugPrint('[Migration] Error migrating products: $e');
@@ -146,6 +123,84 @@ class FirebaseMigrationService {
       debugPrint('[Migration] Local SQLite to Firestore migration completed successfully.');
     } catch (e) {
       debugPrint('[Migration] Migration failed with error: $e');
+    }
+  }
+
+  /// Permanently removes demo/seed test data (masonry catalog and sample customers)
+  /// from both local SQLite and Firestore.
+  static Future<void> purgeTestData() async {
+    try {
+      debugPrint('[Cleanup] Purging demo/seed test data...');
+
+      // 1. Purge from local SQLite
+      try {
+        final db = await AppDatabase.instance.database;
+        await db.delete(
+          'customers',
+          where: "phone IN ('98470 12345', '94471 56789') OR name IN ('Ringle', 'John')",
+        );
+        await db.delete(
+          'products',
+          where: "name IN ('4 inch Block', '6 inch Block', '8 inch Block', 'Solid Concrete Block', 'Concrete Paver Block', 'Fly Ash Brick')",
+        );
+      } catch (e) {
+        debugPrint('[Cleanup] Local SQLite cleanup note: $e');
+      }
+
+      // 2. Purge test products from Firestore
+      try {
+        final productCollection = CompanyConfig.productsCollection();
+        const testProductNames = {
+          '4 inch Block',
+          '6 inch Block',
+          '8 inch Block',
+          'Solid Concrete Block',
+          'Concrete Paver Block',
+          'Fly Ash Brick',
+        };
+        final snapshot = await productCollection.get();
+        final batch = FirebaseFirestore.instance.batch();
+        int deletedProducts = 0;
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          if (testProductNames.contains(data['name'])) {
+            batch.delete(doc.reference);
+            deletedProducts++;
+          }
+        }
+        if (deletedProducts > 0) {
+          await batch.commit();
+          debugPrint('[Cleanup] Purged $deletedProducts test products from Firestore.');
+        }
+      } catch (e) {
+        debugPrint('[Cleanup] Firestore product cleanup note: $e');
+      }
+
+      // 3. Purge test customers from Firestore
+      try {
+        final customerCollection = CompanyConfig.customersCollection();
+        const testCustomerPhones = {'98470 12345', '94471 56789'};
+        const testCustomerNames = {'Ringle', 'John'};
+        final snapshot = await customerCollection.get();
+        final batch = FirebaseFirestore.instance.batch();
+        int deletedCustomers = 0;
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          if (testCustomerPhones.contains(data['phone']) ||
+              testCustomerNames.contains(data['name'])) {
+            batch.delete(doc.reference);
+            deletedCustomers++;
+          }
+        }
+        if (deletedCustomers > 0) {
+          await batch.commit();
+          debugPrint('[Cleanup] Purged $deletedCustomers test customers from Firestore.');
+        }
+      } catch (e) {
+        debugPrint('[Cleanup] Firestore customer cleanup note: $e');
+      }
+    } catch (e) {
+      debugPrint('[Cleanup] Purge test data error: $e');
     }
   }
 }

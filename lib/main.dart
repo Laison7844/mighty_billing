@@ -29,6 +29,7 @@ void main() async {
 
     // Run safe local database migration to Firestore if not already completed
     await FirebaseMigrationService.migrateIfNeeded();
+    await FirebaseMigrationService.purgeTestData();
   } catch (e) {
     debugPrint('Firebase initialization / migration warning: $e');
   }

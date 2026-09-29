@@ -29,8 +29,8 @@ class DashboardScreen extends ConsumerWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            LogoWidget(size: 28, customPath: settings.customLogoPath),
-            const SizedBox(width: 10),
+            LogoWidget(size: 50, customPath: settings.customLogoPath),
+            const SizedBox(width: 5),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -62,201 +62,205 @@ class DashboardScreen extends ConsumerWidget {
       body: SafeArea(
         top: false,
         child: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(dashboardMetricsProvider);
-          ref.invalidate(invoicesProvider);
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Highlight Metrics Cards (Today's Sales & Outstanding)
-              metricsAsync.when(
-                data: (metrics) {
-                  final todaySales =
-                      (metrics['todaySales'] as num?)?.toDouble() ?? 0.0;
-                  final totalOutstanding =
-                      (metrics['totalOutstanding'] as num?)?.toDouble() ?? 0.0;
-                  final todayBills = (metrics['todayBills'] as int?) ?? 0;
-                  final totalBills = (metrics['totalBills'] as int?) ?? 0;
+          onRefresh: () async {
+            ref.invalidate(dashboardMetricsProvider);
+            ref.invalidate(invoicesProvider);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Highlight Metrics Cards (Today's Sales & Outstanding)
+                metricsAsync.when(
+                  data: (metrics) {
+                    final todaySales =
+                        (metrics['todaySales'] as num?)?.toDouble() ?? 0.0;
+                    final totalOutstanding =
+                        (metrics['totalOutstanding'] as num?)?.toDouble() ??
+                        0.0;
+                    final todayBills = (metrics['todayBills'] as int?) ?? 0;
+                    final totalBills = (metrics['totalBills'] as int?) ?? 0;
 
-                  return Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _heroMetricCard(
-                              title: "Today's Sales",
-                              amount: todaySales,
-                              subtitle: '$todayBills bills today',
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _heroMetricCard(
+                                title: "Today's Sales",
+                                amount: todaySales,
+                                subtitle: '$todayBills bills today',
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF1E293B),
+                                    Color(0xFF0F172A),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                accentColor: AppColors.accent,
+                                icon: Icons.trending_up,
                               ),
-                              accentColor: AppColors.accent,
-                              icon: Icons.trending_up,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _heroMetricCard(
-                              title: 'Total Outstanding',
-                              amount: totalOutstanding,
-                              subtitle: '$totalBills total bills',
-                              gradient: LinearGradient(
-                                colors: [
-                                  totalOutstanding > 0
-                                      ? const Color(0xFF7F1D1D)
-                                      : const Color(0xFF064E3B),
-                                  totalOutstanding > 0
-                                      ? const Color(0xFF991B1B)
-                                      : const Color(0xFF047857),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _heroMetricCard(
+                                title: 'Total Outstanding',
+                                amount: totalOutstanding,
+                                subtitle: '$totalBills total bills',
+                                gradient: LinearGradient(
+                                  colors: [
+                                    totalOutstanding > 0
+                                        ? const Color(0xFF7F1D1D)
+                                        : const Color(0xFF064E3B),
+                                    totalOutstanding > 0
+                                        ? const Color(0xFF991B1B)
+                                        : const Color(0xFF047857),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                accentColor: totalOutstanding > 0
+                                    ? const Color(0xFFFCA5A5)
+                                    : const Color(0xFF6EE7B7),
+                                icon: Icons.account_balance_wallet_outlined,
                               ),
-                              accentColor: totalOutstanding > 0
-                                  ? const Color(0xFFFCA5A5)
-                                  : const Color(0xFF6EE7B7),
-                              icon: Icons.account_balance_wallet_outlined,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-                error: (e, s) => Text('Error loading stats: $e'),
-              ),
-              const SizedBox(height: 18),
-
-              // Big New Bill Action Button
-              SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.add_circle_outline, size: 22),
-                  label: const Text(
-                    ' NEW BILL',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const CreateInvoiceScreen(),
-                      ),
+                          ],
+                        ),
+                      ],
                     );
                   },
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Recent Bills Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Recent Bills',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(),
                     ),
                   ),
-                  TextButton(
-                    onPressed: onNavigateToInvoices,
-                    child: const Text('View All'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
+                  error: (e, s) => Text('Error loading stats: $e'),
+                ),
+                const SizedBox(height: 18),
 
-              // Recent Bills List
-              metricsAsync.when(
-                data: (metrics) {
-                  final recentInvoices =
-                      (metrics['recentInvoices'] as List<Invoice>?) ?? [];
-                  if (recentInvoices.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 36,
-                        horizontal: 16,
+                // Big New Bill Action Button
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
+                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 22),
+                    label: const Text(
+                      ' NEW BILL',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
                       ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 42,
-                            color: AppColors.textMuted,
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'No bills created yet',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Tap "+ NEW BILL" above to create your first invoice.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: recentInvoices
-                        .map((inv) => _buildRecentBillCard(context, inv))
-                        .toList(),
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CreateInvoiceScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ),
-                error: (e, s) => const SizedBox.shrink(),
-              ),
-            ],
+                const SizedBox(height: 24),
+
+                // Recent Bills Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Recent Bills',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onNavigateToInvoices,
+                      child: const Text('View All'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Recent Bills List
+                metricsAsync.when(
+                  data: (metrics) {
+                    final recentInvoices =
+                        (metrics['recentInvoices'] as List<Invoice>?) ?? [];
+                    if (recentInvoices.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 36,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 42,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'No bills created yet',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Tap "+ NEW BILL" above to create your first invoice.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: recentInvoices
+                          .map((inv) => _buildRecentBillCard(context, inv))
+                          .toList(),
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (e, s) => const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _heroMetricCard({
